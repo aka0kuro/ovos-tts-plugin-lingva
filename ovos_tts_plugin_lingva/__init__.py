@@ -1,5 +1,6 @@
 import requests
 import json
+from urllib.parse import quote
 from ovos_plugin_manager.templates.tts import TTS
 from ovos_utils import classproperty
 from ovos_utils.lang import standardize_lang_tag
@@ -195,30 +196,65 @@ class LingvaTTS(TTS):
         
         try:
             # Construir la URL de la API de Lingva para TTS
-            tts_url = f"{self.lingva_instance}/api/tts/{lingva_lang}/{sentence}"
-            
+            encoded_sentence = quote(sentence, safe="")
+            tts_url = f"{self.lingva_instance}/api/tts/{lingva_lang}/{encoded_sentence}"
+
             # Realizar la petición a la API de Lingva
-            response = requests.get(tts_url, timeout=30)
+            headers = {
+                "User-Agent": "OVOS-LingvaTTS/1.0 (+https://github.com/OpenVoiceOS/ovos-tts-plugin-lingva)",
+                "Accept": "audio/*,application/octet-stream;q=0.9,*/*;q=0.8"
+            }
+            response = requests.get(tts_url, headers=headers, timeout=30)
             response.raise_for_status()
-            
+
+            # Validar tipo de contenido devuelto
+            content_type = response.headers.get("Content-Type", "")
+            if not (content_type.startswith("audio/") or content_type == "application/octet-stream"):
+                # Registrar un fragmento de respuesta si es texto para facilitar diagnóstico
+                try:
+                    if content_type.startswith("text/") or "json" in content_type:
+                        snippet = response.text[:200]
+                        self.log.debug(f"Respuesta Lingva (fragmento): {snippet}")
+                except Exception:
+                    pass
+                self.log.error(f"Contenido inesperado de Lingva: {content_type} - URL: {tts_url}")
+                raise ValueError(f"Lingva devolvió contenido no-audio: {content_type}")
+
             # Guardar el audio recibido
             with open(wav_file, 'wb') as f:
                 f.write(response.content)
-            
+
             return (wav_file, None)  # No phonemes
-            
+
         except requests.exceptions.RequestException as e:
             self.log.error(f"Error fetching TTS from Lingva: {e}")
             # Fallback: intentar con el idioma base si falla
             if lang != lingva_lang:
                 try:
-                    fallback_url = f"{self.lingva_instance}/api/tts/{lingva_lang}/{sentence}"
-                    response = requests.get(fallback_url, timeout=30)
+                    encoded_sentence = quote(sentence, safe="")
+                    fallback_lang = lang.split("-")[0]
+                    fallback_url = f"{self.lingva_instance}/api/tts/{fallback_lang}/{encoded_sentence}"
+                    headers = {
+                        "User-Agent": "OVOS-LingvaTTS/1.0 (+https://github.com/OpenVoiceOS/ovos-tts-plugin-lingva)",
+                        "Accept": "audio/*,application/octet-stream;q=0.9,*/*;q=0.8"
+                    }
+                    response = requests.get(fallback_url, headers=headers, timeout=30)
                     response.raise_for_status()
-                    
+
+                    content_type = response.headers.get("Content-Type", "")
+                    if not (content_type.startswith("audio/") or content_type == "application/octet-stream"):
+                        try:
+                            if content_type.startswith("text/") or "json" in content_type:
+                                snippet = response.text[:200]
+                                self.log.debug(f"Respuesta Lingva fallback (fragmento): {snippet}")
+                        except Exception:
+                            pass
+                        self.log.error(f"Contenido inesperado de Lingva (fallback): {content_type} - URL: {fallback_url}")
+                        raise ValueError(f"Lingva devolvió contenido no-audio (fallback): {content_type}")
+
                     with open(wav_file, 'wb') as f:
                         f.write(response.content)
-                    
+
                     return (wav_file, None)
                 except requests.exceptions.RequestException as fallback_e:
                     self.log.error(f"Fallback TTS also failed: {fallback_e}")
