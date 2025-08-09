@@ -1,0 +1,9 @@
+{
+  "tts": {
+    "module": "ovos-tts-plugin-lingva",
+    "ovos-tts-plugin-lingva": {
+      "lingva_instance": "https://lingva.ml",
+      "lang": "es"
+    }
+  }
+} 
