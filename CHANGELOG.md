@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.5](https://github.com/OpenVoiceOS/ovos-tts-plugin-lingva/tree/1.0.5) (2025-08-10)
+
+**Chores:**
+- Añadir `.gitignore` y limpiar artefactos locales de desarrollo
+
 ## [2.0.0](https://github.com/OpenVoiceOS/ovos-tts-plugin-lingva/tree/2.0.0) (2024-08-05)
 
 **BREAKING CHANGES:**

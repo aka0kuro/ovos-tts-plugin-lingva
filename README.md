@@ -11,6 +11,7 @@ This plugin is privacy-friendly and does not require any API keys or authenticat
 
 ## Install
 
+pip install git+https://github.com/aka0kuro/ovos-tts-plugin-lingva.git
 
 
 ## Configuration
