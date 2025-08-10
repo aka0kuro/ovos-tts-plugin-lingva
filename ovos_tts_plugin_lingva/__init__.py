@@ -168,6 +168,69 @@ class LingvaTTS(TTS):
         super().__init__(*args, **kwargs, audio_ext="mp3")
         self.lingva_instance = self.config.get("lingva_instance", "https://lingva.ml")
 
+    def _download_tts_to_file(self, sentence: str, lang_code: str, wav_file: str) -> bool:
+        """Try fetching TTS audio using Lingva in two steps:
+        1) Primary: /api/tts/{lang}/{text} which should return audio bytes
+        2) Fallback: /api/v1/audio/{lang}/{text} which returns JSON with an 'audio' byte array
+
+        Returns True if the file was written successfully, False otherwise.
+        """
+        encoded_sentence = quote(sentence, safe="")
+
+        # Step 1: try /api/tts
+        tts_url = f"{self.lingva_instance}/api/tts/{lang_code}/{encoded_sentence}"
+        headers = {
+            "User-Agent": "OVOS-LingvaTTS/1.0 (+https://github.com/OpenVoiceOS/ovos-tts-plugin-lingva)",
+            "Accept": "audio/*,application/octet-stream;q=0.9,*/*;q=0.8"
+        }
+        try:
+            response = requests.get(tts_url, headers=headers, timeout=30)
+            response.raise_for_status()
+            content_type = response.headers.get("Content-Type", "")
+            if content_type.startswith("audio/") or content_type == "application/octet-stream":
+                with open(wav_file, "wb") as f:
+                    f.write(response.content)
+                return True
+            else:
+                # Log a small snippet to help diagnose HTML/text responses
+                try:
+                    if content_type.startswith("text/") or "json" in content_type:
+                        snippet = response.text[:200]
+                        self.log.debug(f"Respuesta Lingva /api/tts no-audio (fragmento): {snippet}")
+                except Exception:
+                    pass
+        except requests.exceptions.RequestException as e:
+            self.log.debug(f"/api/tts request failed: {e}")
+
+        # Step 2: try /api/v1/audio (JSON with byte array)
+        v1_url = f"{self.lingva_instance}/api/v1/audio/{lang_code}/{encoded_sentence}"
+        json_headers = {
+            "User-Agent": "OVOS-LingvaTTS/1.0 (+https://github.com/OpenVoiceOS/ovos-tts-plugin-lingva)",
+            "Accept": "application/json"
+        }
+        try:
+            response = requests.get(v1_url, headers=json_headers, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            audio_arr = data.get("audio")
+            if isinstance(audio_arr, list):
+                try:
+                    audio_bytes = bytes(audio_arr)
+                except Exception as e:
+                    self.log.error(f"No se pudo convertir JSON de audio a bytes: {e}")
+                    return False
+                with open(wav_file, "wb") as f:
+                    f.write(audio_bytes)
+                return True
+            else:
+                self.log.error("Respuesta de /api/v1/audio sin 'audio' válido")
+        except requests.exceptions.RequestException as e:
+            self.log.debug(f"/api/v1/audio request failed: {e}")
+        except Exception as e:
+            self.log.debug(f"Error procesando respuesta de /api/v1/audio: {e}")
+
+        return False
+
     @classproperty
     def available_languages(cls) -> set:
         """Return available languages supported by Lingva"""
@@ -194,73 +257,18 @@ class LingvaTTS(TTS):
         if lingva_lang not in LINGVA_LANG_MAP.values():
             lingva_lang = lang.split("-")[0]
         
-        try:
-            # Construir la URL de la API de Lingva para TTS
-            encoded_sentence = quote(sentence, safe="")
-            tts_url = f"{self.lingva_instance}/api/tts/{lingva_lang}/{encoded_sentence}"
+        # Primer intento: idioma mapeado
+        if self._download_tts_to_file(sentence, lingva_lang, wav_file):
+            return (wav_file, None)
 
-            # Realizar la petición a la API de Lingva
-            headers = {
-                "User-Agent": "OVOS-LingvaTTS/1.0 (+https://github.com/OpenVoiceOS/ovos-tts-plugin-lingva)",
-                "Accept": "audio/*,application/octet-stream;q=0.9,*/*;q=0.8"
-            }
-            response = requests.get(tts_url, headers=headers, timeout=30)
-            response.raise_for_status()
+        # Segundo intento: idioma base si es distinto
+        if lang != lingva_lang:
+            fallback_lang = lang.split("-")[0]
+            if self._download_tts_to_file(sentence, fallback_lang, wav_file):
+                return (wav_file, None)
 
-            # Validar tipo de contenido devuelto
-            content_type = response.headers.get("Content-Type", "")
-            if not (content_type.startswith("audio/") or content_type == "application/octet-stream"):
-                # Registrar un fragmento de respuesta si es texto para facilitar diagnóstico
-                try:
-                    if content_type.startswith("text/") or "json" in content_type:
-                        snippet = response.text[:200]
-                        self.log.debug(f"Respuesta Lingva (fragmento): {snippet}")
-                except Exception:
-                    pass
-                self.log.error(f"Contenido inesperado de Lingva: {content_type} - URL: {tts_url}")
-                raise ValueError(f"Lingva devolvió contenido no-audio: {content_type}")
-
-            # Guardar el audio recibido
-            with open(wav_file, 'wb') as f:
-                f.write(response.content)
-
-            return (wav_file, None)  # No phonemes
-
-        except requests.exceptions.RequestException as e:
-            self.log.error(f"Error fetching TTS from Lingva: {e}")
-            # Fallback: intentar con el idioma base si falla
-            if lang != lingva_lang:
-                try:
-                    encoded_sentence = quote(sentence, safe="")
-                    fallback_lang = lang.split("-")[0]
-                    fallback_url = f"{self.lingva_instance}/api/tts/{fallback_lang}/{encoded_sentence}"
-                    headers = {
-                        "User-Agent": "OVOS-LingvaTTS/1.0 (+https://github.com/OpenVoiceOS/ovos-tts-plugin-lingva)",
-                        "Accept": "audio/*,application/octet-stream;q=0.9,*/*;q=0.8"
-                    }
-                    response = requests.get(fallback_url, headers=headers, timeout=30)
-                    response.raise_for_status()
-
-                    content_type = response.headers.get("Content-Type", "")
-                    if not (content_type.startswith("audio/") or content_type == "application/octet-stream"):
-                        try:
-                            if content_type.startswith("text/") or "json" in content_type:
-                                snippet = response.text[:200]
-                                self.log.debug(f"Respuesta Lingva fallback (fragmento): {snippet}")
-                        except Exception:
-                            pass
-                        self.log.error(f"Contenido inesperado de Lingva (fallback): {content_type} - URL: {fallback_url}")
-                        raise ValueError(f"Lingva devolvió contenido no-audio (fallback): {content_type}")
-
-                    with open(wav_file, 'wb') as f:
-                        f.write(response.content)
-
-                    return (wav_file, None)
-                except requests.exceptions.RequestException as fallback_e:
-                    self.log.error(f"Fallback TTS also failed: {fallback_e}")
-                    raise e
-            else:
-                raise e
+        # Si ambos intentos fallaron, error explícito
+        raise ValueError("No se pudo obtener audio TTS desde Lingva (ni /api/tts ni /api/v1/audio)")
 
 
 if __name__ == "__main__":
