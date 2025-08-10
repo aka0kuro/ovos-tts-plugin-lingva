@@ -3,7 +3,7 @@
 ## [1.0.5](https://github.com/aka0kuro/ovos-tts-plugin-lingva/tree/1.0.5) (2025-08-10)
 
 **Chores:**
-- Añadir `.gitignore` y limpiar artefactos locales de desarrollo
+- Add `.gitignore` and clean local development artifacts
 
 ## [1.0.4](https://github.com/aka0kuro/ovos-tts-plugin-lingva/tree/1.0.4) (2025-08-05)
 

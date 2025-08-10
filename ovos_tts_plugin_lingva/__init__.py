@@ -5,7 +5,7 @@ from ovos_plugin_manager.templates.tts import TTS
 from ovos_utils import classproperty
 from ovos_utils.lang import standardize_lang_tag
 
-# Mapeo de idiomas de OVOS a códigos de idioma de Lingva
+# Map OVOS language tags to Lingva language codes
 LINGVA_LANG_MAP = {
     "en": "en",
     "en-US": "en",
@@ -196,7 +196,7 @@ class LingvaTTS(TTS):
                 try:
                     if content_type.startswith("text/") or "json" in content_type:
                         snippet = response.text[:200]
-                        self.log.debug(f"Respuesta Lingva /api/tts no-audio (fragmento): {snippet}")
+                        self.log.debug(f"Lingva /api/tts non-audio response (snippet): {snippet}")
                 except Exception:
                     pass
         except requests.exceptions.RequestException as e:
@@ -217,17 +217,17 @@ class LingvaTTS(TTS):
                 try:
                     audio_bytes = bytes(audio_arr)
                 except Exception as e:
-                    self.log.error(f"No se pudo convertir JSON de audio a bytes: {e}")
+                    self.log.error(f"Could not convert audio JSON to bytes: {e}")
                     return False
                 with open(wav_file, "wb") as f:
                     f.write(audio_bytes)
                 return True
             else:
-                self.log.error("Respuesta de /api/v1/audio sin 'audio' válido")
+                self.log.error("Invalid /api/v1/audio response: missing valid 'audio' field")
         except requests.exceptions.RequestException as e:
             self.log.debug(f"/api/v1/audio request failed: {e}")
         except Exception as e:
-            self.log.debug(f"Error procesando respuesta de /api/v1/audio: {e}")
+            self.log.debug(f"Error processing /api/v1/audio response: {e}")
 
         return False
 
@@ -250,25 +250,25 @@ class LingvaTTS(TTS):
         lang = lang or self.lang
         lang = standardize_lang_tag(lang, macro=True)
         
-        # Mapear el idioma de OVOS al código de idioma de Lingva
+        # Map the OVOS language to the Lingva language code
         lingva_lang = LINGVA_LANG_MAP.get(lang, lang.split("-")[0])
         
-        # Si el idioma no está en el mapeo, usar el código base
+        # If the language is not mapped, fall back to the base code
         if lingva_lang not in LINGVA_LANG_MAP.values():
             lingva_lang = lang.split("-")[0]
         
-        # Primer intento: idioma mapeado
+        # First attempt: mapped language
         if self._download_tts_to_file(sentence, lingva_lang, wav_file):
             return (wav_file, None)
 
-        # Segundo intento: idioma base si es distinto
+        # Second attempt: base language if different
         if lang != lingva_lang:
             fallback_lang = lang.split("-")[0]
             if self._download_tts_to_file(sentence, fallback_lang, wav_file):
                 return (wav_file, None)
 
-        # Si ambos intentos fallaron, error explícito
-        raise ValueError("No se pudo obtener audio TTS desde Lingva (ni /api/tts ni /api/v1/audio)")
+        # If both attempts fail, raise a clear error
+        raise ValueError("Failed to obtain TTS audio from Lingva (both /api/tts and /api/v1/audio failed)")
 
 
 if __name__ == "__main__":
@@ -276,8 +276,8 @@ if __name__ == "__main__":
     ssml = "Hello world"
     e.get_tts(ssml, f"en-US.mp3", lang="en-US")
 
-    ssml = "Olá Mundo! Bom dia alegria"
+    ssml = "Hello world"
     e.get_tts(ssml, f"pt-BR.mp3", lang="pt-BR")
-
-    ssml = "Hola mundo"
+ 
+    ssml = "Hello world"
     e.get_tts(ssml, f"es-ES.mp3", lang="es-ES")

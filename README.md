@@ -1,6 +1,8 @@
 ## Description
 OVOS TTS plugin for [Lingva.ml](https://lingva.ml)
 
+by aka0kuro
+
 ### About Lingva.ml
 
 [Lingva.ml](https://lingva.ml) is a privacy-focused alternative to Google Translate that provides translation and text-to-speech services without tracking or storing user data. This plugin uses the Lingva.ml API to convert text to speech in multiple languages.
@@ -32,7 +34,7 @@ You can configure the Lingva instance and language settings:
     "module": "ovos-tts-plugin-lingva",
     "ovos-tts-plugin-lingva": {
       "lingva_instance": "https://lingva.ml",
-      "lang": "es"
+      "lang": "en"
     }
 ```
 
