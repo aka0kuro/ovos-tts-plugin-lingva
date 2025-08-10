@@ -180,7 +180,7 @@ class LingvaTTS(TTS):
         # Step 1: try /api/tts
         tts_url = f"{self.lingva_instance}/api/tts/{lang_code}/{encoded_sentence}"
         headers = {
-            "User-Agent": "OVOS-LingvaTTS/1.0 (+https://github.com/OpenVoiceOS/ovos-tts-plugin-lingva)",
+            "User-Agent": "OVOS-LingvaTTS/1.0 (+https://github.com/aka0kuro/ovos-tts-plugin-lingva)",
             "Accept": "audio/*,application/octet-stream;q=0.9,*/*;q=0.8"
         }
         try:
@@ -205,7 +205,7 @@ class LingvaTTS(TTS):
         # Step 2: try /api/v1/audio (JSON with byte array)
         v1_url = f"{self.lingva_instance}/api/v1/audio/{lang_code}/{encoded_sentence}"
         json_headers = {
-            "User-Agent": "OVOS-LingvaTTS/1.0 (+https://github.com/OpenVoiceOS/ovos-tts-plugin-lingva)",
+            "User-Agent": "OVOS-LingvaTTS/1.0 (+https://github.com/aka0kuro/ovos-tts-plugin-lingva)",
             "Accept": "application/json"
         }
         try:
